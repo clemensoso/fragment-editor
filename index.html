@@ -165,6 +165,7 @@ button:focus-visible,.file:focus-within{outline:1px solid var(--acc);outline-off
 
     <section>
       <h2 data-i18n="fonts">Schriften</h2>
+      <p class="hint" id="fontsHint"></p>
       <div class="slots" id="slots"></div>
       <div class="chips" id="chips"></div>
       <label class="file"><span data-i18n="upload">Eigene Schrift laden (.ttf, .otf, .woff)</span><input type="file" id="upload" accept=".ttf,.otf,.woff,.woff2"></label>
@@ -252,6 +253,8 @@ const I18N = {
     svgBtn:'SVG sichern', pngBtn:'PNG', svgFail:'SVG-Export fehlgeschlagen: Die Schriftdatei ließ sich nicht laden. Bei eigenen Schriften bitte TTF, OTF oder WOFF verwenden.',
     whiteOnBlack:'Weiß auf Schwarz', blackOnWhite:'Schwarz auf Weiß',
     addFont:'Schrift hinzufügen', removeFont:'Schrift entfernen',
+    fontsHint:'Feld wählen, dann eine Schrift anklicken.', fontsHintSel:n => `Rahmen ${n} ausgewählt: Ein Klick auf eine Schrift ändert nur diesen Rahmen.`,
+    maxFonts:'Maximal sechs Schriften. Entferne eine oder wähle eine bereits benutzte.',
   },
   en:{
     tool:'Tool', canvas:'Canvas',
@@ -281,6 +284,8 @@ const I18N = {
     svgBtn:'Save SVG', pngBtn:'PNG', svgFail:'SVG export failed: the font file could not be loaded. For your own fonts, please use TTF, OTF or WOFF.',
     whiteOnBlack:'White on black', blackOnWhite:'Black on white',
     addFont:'Add font', removeFont:'Remove font',
+    fontsHint:'Choose a slot, then click a font.', fontsHintSel:n => `Frame ${n} selected: clicking a font changes only this frame.`,
+    maxFonts:'Six fonts at most. Remove one or pick a font that is already in use.',
   },
 };
 let lang = 'de';
@@ -764,16 +769,35 @@ function buildChips(){
   FONTS.forEach(f => {
     const b = document.createElement('button'); b.className = 'chip'; b.type = 'button'; b.dataset.id = f.id;
     b.textContent = f.label; styleFor(b, f); if (f.small) b.style.fontSize = '13px';
-    b.addEventListener('click', () => {
-      if (state.fonts[state.slot] === f.id) return;
-      snapshot(); state.fonts[state.slot] = f.id; syncFonts(); render();
-    });
+    b.addEventListener('click', () => pickFont(f.id));
     box.appendChild(b);
   });
   syncFonts();
 }
+/* Schrift wählen. Ist ein Rahmen ausgewählt, bekommt nur dieser Rahmen die Schrift:
+   gibt es sie schon in einem Slot, wird dieser benutzt; sonst wird der Slot des Rahmens umgestellt
+   (wenn kein anderer Rahmen ihn nutzt) oder ein neuer Slot angelegt. Ohne Auswahl ändert sich der aktive Slot. */
+function pickFont(id){
+  const r = state.frames[sel];
+  if (!r){
+    if (state.fonts[state.slot] === id) return;
+    snapshot(); state.fonts[state.slot] = id; syncFonts(); render(); return;
+  }
+  const cur = slotIndex(r.font);
+  if (state.fonts[cur] === id) return;
+  snapshot();
+  const existing = state.fonts.indexOf(id);
+  const shared = state.frames.some(o => o !== r && slotIndex(o.font) === cur);
+  if (existing >= 0) r.font = letter(existing);
+  else if (cur > 0 && !shared) state.fonts[cur] = id;
+  else if (state.fonts.length < MAX_FONTS){ state.fonts.push(id); r.font = letter(state.fonts.length - 1); }
+  else { hist.pop(); toast(t('maxFonts')); return; }
+  syncSel(); render();
+}
 /* Schrift-Slots: A außen, B, C … innen. Neue Slots über „+“, entfernen über „×“. */
 function syncFonts(){
+  const rs = state.frames[sel];
+  $('#fontsHint').textContent = rs ? t('fontsHintSel')(sel + 1) : t('fontsHint');
   const box = $('#slots'); box.innerHTML = '';
   state.fonts.forEach((id, i) => {
     const f = byId(id), b = document.createElement('div');
@@ -782,7 +806,11 @@ function syncFonts(){
     b.innerHTML = `<small><i>${letter(i)}</i><span>${i ? t('inner') + (state.fonts.length > 2 ? ' ' + i : '') : t('outer')}</span></small><span class="name"></span>`
       + (i >= 2 ? `<button class="x" type="button" aria-label="${t('removeFont')} ${letter(i)}" title="${t('removeFont')}">×</button>` : '');
     const nm = b.querySelector('.name'); nm.textContent = f.label; styleFor(nm, f); nm.style.fontSize = f.small ? '15px' : '22px';
-    const pick = () => { state.slot = i; syncFonts(); };
+    const pick = () => {
+      state.slot = i;
+      const r = state.frames[sel]; // mit Auswahl: Rahmen zeigt die Schrift dieses Slots
+      if (r && r.font !== letter(i)){ snapshot(); r.font = letter(i); syncSel(); render(); } else syncFonts();
+    };
     b.addEventListener('click', e => { if (e.target.closest('.x')){ e.stopPropagation(); removeSlot(i); } else pick(); });
     b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); pick(); } });
     box.appendChild(b);
@@ -842,7 +870,7 @@ $('#upload').addEventListener('change', async e => {
     await face.load(); document.fonts.add(face);
     const id = 'u' + upCount, label = file.name.replace(/\.(ttf|otf|woff2?)$/i, '').slice(0, 24);
     FONTS.push({id, label, fam:`"${fam}"`, w:400, buf});
-    snapshot(); state.fonts[state.slot] = id; buildChips(); render(); toast(t('loaded')(label, letter(state.slot)));
+    buildChips(); pickFont(id); toast(t('loaded')(label, letter(state.slot)));
   } catch (err) { toast(t('badFont')); }
   e.target.value = '';
 });
@@ -853,6 +881,8 @@ function syncSel(){
   $('#selEmpty').hidden = !!r; $('#selBody').hidden = !r;
   $('#selInfo').textContent = r ? t('of')(sel + 1, state.frames.length) : (state.frames.length ? t('total')(state.frames.length) : '');
   $('#clear').disabled = !state.frames.length;
+  if (r) state.slot = slotIndex(r.font); // Schrift-Panel zeigt die Schrift des ausgewählten Rahmens
+  syncFonts();
   if (!r) return;
   $$('#rFont button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === r.font)));
   $('#resetShape').hidden = !r.pts;
