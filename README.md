@@ -11,4 +11,6 @@ Ein einfacher Editor, um zwei Schriften in einem Wort zu kombinieren. Rahmen auf
 - **Stück (3):** Rahmen samt Inhalt verschieben
 - Pfeiltasten verschieben (Shift = 10 px), ⌫ löscht, ⌘Z macht rückgängig
 
-Alles steckt in einer einzigen `index.html`, ohne Build-Schritt. Die Schriften kommen von Google Fonts.
+Export als **SVG** (Buchstaben als echte Vektorpfade, per opentype.js) oder als PNG. Oben rechts lässt sich die Oberfläche zwischen Deutsch und Englisch umschalten.
+
+Alles steckt in einer einzigen `index.html`, ohne Build-Schritt. Die Schriften kommen von Google Fonts, für den SVG-Export werden die Schriftdateien von Fontsource (jsDelivr) geladen.
