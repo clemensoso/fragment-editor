@@ -129,6 +129,7 @@ button:focus-visible,.file:focus-within{outline:1px solid var(--acc);outline-off
         <button data-mode="frame" data-i18n-title="frameTitle"><span data-i18n="frame">Rahmen</span> <kbd>1</kbd></button>
         <button data-mode="content" data-i18n-title="contentTitle"><span data-i18n="content">Inhalt</span> <kbd>2</kbd></button>
         <button data-mode="piece" data-i18n-title="pieceTitle"><span data-i18n="piece">Stück</span> <kbd>3</kbd></button>
+        <button data-mode="shape" data-i18n-title="shapeTitle"><span data-i18n="shape">Freiform</span> <kbd>4</kbd></button>
       </div>
       <div class="right">
         <button class="btn" id="undo" data-i18n="undo" data-i18n-title="undoTitle">Rückgängig</button>
@@ -173,6 +174,7 @@ button:focus-visible,.file:focus-within{outline:1px solid var(--acc);outline-off
         <div data-sliders="rDx,rDy"></div>
         <div class="row">
           <button class="btn" id="resetContent" data-i18n="resetContent">Inhalt zurücksetzen</button>
+          <button class="btn" id="resetShape" data-i18n="resetShape" hidden>Form zurücksetzen</button>
           <button class="btn" id="del" data-i18n="delete">Löschen</button>
         </div>
       </div>
@@ -232,6 +234,8 @@ const I18N = {
     tipframe:'<b>Ziehen</b> auf leerer Fläche: neuer Rahmen · <b>Rahmen ziehen</b>: Ausschnitt verschieben · <b>Ecken</b>: Größe ändern',
     tipcontent:'<b>Im Rahmen ziehen</b>: Schrift im Rahmen verschieben, der Rahmen bleibt stehen',
     tippiece:'<b>Rahmen ziehen</b>: Rahmen samt Inhalt frei verschieben, wie ein ausgeschnittenes Stück',
+    shape:'Freiform', shapeTitle:'Ecken frei verziehen, z. B. für schräge Formen', resetShape:'Form zurücksetzen',
+    tipshape:'<b>Rahmen anklicken</b>, dann <b>Ecken ziehen</b>: Form frei verziehen, z. B. schräg · <b>Rahmen ziehen</b>: verschieben',
     tipKeys:' · <b>⌫</b> löschen · <b>⌘Z</b> rückgängig',
     hint:'Rahmen gesetzt. Mit „Inhalt“ (2) verschiebst du die Schrift darin, mit „Stück“ (3) den ganzen Rahmen.',
     loaded:(l, s) => `${l} geladen und als Schrift ${s} gesetzt`,
@@ -257,6 +261,8 @@ const I18N = {
     tipframe:'<b>Drag</b> on empty space: new frame · <b>Drag a frame</b>: move the window · <b>Corners</b>: resize',
     tipcontent:'<b>Drag inside a frame</b>: move the type inside it, the frame stays put',
     tippiece:'<b>Drag a frame</b>: move frame and content freely, like a cut-out piece',
+    shape:'Free form', shapeTitle:'Drag corners freely, e.g. for slanted shapes', resetShape:'Reset shape',
+    tipshape:'<b>Click a frame</b>, then <b>drag its corners</b>: distort the shape freely, e.g. slanted · <b>Drag a frame</b>: move it',
     tipKeys:' · <b>⌫</b> delete · <b>⌘Z</b> undo',
     hint:'Frame placed. Use “Content” (2) to move the type inside it, or “Piece” (3) to move the whole frame.',
     loaded:(l, s) => `${l} loaded and set as font ${s}`,
@@ -371,6 +377,23 @@ function drawBlock(c, f, L, isA){
 
 /* ---------- Zeichnen ---------- */
 const cv = $('#cv'), ctx = cv.getContext('2d');
+/* Freiform: ein Rahmen hat optional pts (4 Ecken, normiert, im Uhrzeigersinn ab oben links), sonst ist er ein Rechteck */
+const rectPts = r => [[r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y + r.h], [r.x, r.y + r.h]];
+const polyOf = (r, W, H) => (r.pts || rectPts(r)).map(([x, y]) => [x * W, y * H]);
+function fitBox(r){
+  const xs = r.pts.map(p => p[0]), ys = r.pts.map(p => p[1]);
+  r.x = Math.min(...xs); r.y = Math.min(...ys); r.w = Math.max(...xs) - r.x; r.h = Math.max(...ys) - r.y;
+}
+function shiftFrame(r, o, dx, dy){ r.x = o.x + dx; r.y = o.y + dy; if (o.pts) r.pts = o.pts.map(([x, y]) => [x + dx, y + dy]); }
+function tracePoly(c, pts){ c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); }
+function inPoly(p, pts){
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++){
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if ((yi > p.y) !== (yj > p.y) && p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
 function paint(c, W, H, ui, ps){
   /* Rahmenkanten auf ganze Gerätepixel legen, sonst scheint Schrift A an der Kante als feine Linie durch */
   const snap = v => Math.round(v * ps) / ps;
@@ -379,10 +402,19 @@ function paint(c, W, H, ui, ps){
   const L = layout(W, H);
   c.fillStyle = C.fg; drawBlock(c, byId(state.A), L, true);
   for (const r of state.frames){
-    const rx = snap(r.x*W), ry = snap(r.y*H), rw = snap(r.x*W + r.w*W) - rx, rh = snap(r.y*H + r.h*H) - ry;
-    if (rw < 1 || rh < 1) continue;
-    c.save(); c.beginPath(); c.rect(rx, ry, rw, rh); c.clip();
-    c.fillStyle = C.bg; c.fillRect(rx, ry, rw, rh);
+    if (r.w*W < 1 || r.h*H < 1) continue;
+    c.save();
+    if (r.pts){
+      /* Freiform: schräge Kanten lassen sich nicht auf Pixel legen, darum wird die Fläche um einen halben Pixel größer abgedeckt */
+      const pts = polyOf(r, W, H);
+      tracePoly(c, pts); c.fillStyle = C.bg; c.fill();
+      c.strokeStyle = C.bg; c.lineWidth = 1.2 / ps; c.stroke();
+      tracePoly(c, pts); c.clip();
+    } else {
+      const rx = snap(r.x*W), ry = snap(r.y*H), rw = snap(r.x*W + r.w*W) - rx, rh = snap(r.y*H + r.h*H) - ry;
+      c.beginPath(); c.rect(rx, ry, rw, rh); c.clip();
+      c.fillStyle = C.bg; c.fillRect(rx, ry, rw, rh);
+    }
     c.translate(r.dx * W, r.dy * H); c.fillStyle = C.fg;
     drawBlock(c, byId(r.font === 'A' ? state.A : state.B), L, r.font === 'A');
     c.restore();
@@ -390,19 +422,21 @@ function paint(c, W, H, ui, ps){
   if (!ui) return;
   c.save(); c.lineWidth = 1;
   state.frames.forEach((r, i) => {
-    const x = r.x*W, y = r.y*H, w = r.w*W, h = r.h*H;
+    const pts = polyOf(r, W, H);
     if (i === sel){
-      c.strokeStyle = C.sel; c.setLineDash([]); c.lineWidth = 1.5; c.strokeRect(x, y, w, h);
-      if (mode === 'frame'){
+      c.strokeStyle = C.sel; c.setLineDash([]); c.lineWidth = 1.5; tracePoly(c, pts); c.stroke();
+      if (mode === 'frame' || mode === 'shape'){
         c.fillStyle = C.bg;
-        for (const [hx, hy] of [[x,y],[x+w,y],[x,y+h],[x+w,y+h]]){ c.fillRect(hx-4.5, hy-4.5, 9, 9); c.strokeRect(hx-4.5, hy-4.5, 9, 9); }
+        for (const [hx, hy] of pts){
+          if (mode === 'shape' || r.pts){ c.beginPath(); c.arc(hx, hy, 5.5, 0, Math.PI * 2); c.fill(); c.stroke(); }
+          else { c.fillRect(hx-4.5, hy-4.5, 9, 9); c.strokeRect(hx-4.5, hy-4.5, 9, 9); }
+        }
       }
       if (mode === 'content' && (r.dx || r.dy)){ // zeigt, wohin der Inhalt verschoben wurde
-        c.setLineDash([2,3]); c.lineWidth = 1; c.strokeRect(x + r.dx*W, y + r.dy*H, w, h);
+        c.setLineDash([2,3]); c.lineWidth = 1; tracePoly(c, pts.map(([x, y]) => [x + r.dx*W, y + r.dy*H])); c.stroke();
       }
     } else if (state.showFrames || mode !== 'frame'){
-      c.strokeStyle = C.frame; c.setLineDash([4,3]); c.lineWidth = 1;
-      c.strokeRect(Math.round(x)+.5, Math.round(y)+.5, Math.round(w), Math.round(h));
+      c.strokeStyle = C.frame; c.setLineDash([4,3]); c.lineWidth = 1; tracePoly(c, pts); c.stroke();
     }
   });
   c.restore();
@@ -458,28 +492,29 @@ let drag = null, hinted = false;
 const toLocal = e => { const b = cv.getBoundingClientRect(); return {x:(e.clientX - b.left) * view.W / b.width, y:(e.clientY - b.top) * view.H / b.height}; };
 const px = r => ({x:r.x*view.W, y:r.y*view.H, w:r.w*view.W, h:r.h*view.H});
 function hitCorner(p, tol){
-  if (mode !== 'frame' || !state.frames[sel]) return null;
-  const q = px(state.frames[sel]), cs = [[q.x,q.y],[q.x+q.w,q.y],[q.x,q.y+q.h],[q.x+q.w,q.y+q.h]];
-  for (let i = 0; i < 4; i++) if (Math.abs(p.x - cs[i][0]) < tol && Math.abs(p.y - cs[i][1]) < tol) return {i, anchor:cs[3 - i]};
+  const r = state.frames[sel];
+  if (!r || (mode !== 'frame' && mode !== 'shape')) return null;
+  const pts = polyOf(r, view.W, view.H);
+  for (let i = 0; i < 4; i++) if (Math.abs(p.x - pts[i][0]) < tol && Math.abs(p.y - pts[i][1]) < tol)
+    return (mode === 'shape' || r.pts) ? {i, vertex:true} : {i, anchor:pts[(i + 2) % 4]};
   return null;
 }
 function hitFrame(p){
-  if (state.frames[sel]){ const q = px(state.frames[sel]); if (p.x >= q.x && p.x <= q.x + q.w && p.y >= q.y && p.y <= q.y + q.h) return sel; }
-  for (let i = state.frames.length - 1; i >= 0; i--){
-    const q = px(state.frames[i]); if (p.x >= q.x && p.x <= q.x + q.w && p.y >= q.y && p.y <= q.y + q.h) return i;
-  }
+  const hit = i => inPoly(p, polyOf(state.frames[i], view.W, view.H));
+  if (state.frames[sel] && hit(sel)) return sel;
+  for (let i = state.frames.length - 1; i >= 0; i--) if (hit(i)) return i;
   return -1;
 }
 cv.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
   const p = toLocal(e), tol = e.pointerType === 'touch' ? 18 : 10, before = snap();
   const corner = hitCorner(p, tol);
-  if (corner){ drag = {type:'size', anchor:corner.anchor, before}; }
+  if (corner){ drag = corner.vertex ? {type:'vertex', i:corner.i, before} : {type:'size', anchor:corner.anchor, before}; }
   else {
     const i = hitFrame(p);
     if (i >= 0){
       sel = i; const r = state.frames[i];
-      drag = {type:mode, sx:p.x, sy:p.y, r0:{...r}, before};
+      drag = {type:mode === 'shape' ? 'frame' : mode, sx:p.x, sy:p.y, r0:{...r}, before};
       if (mode !== 'frame') cv.style.cursor = 'grabbing';
     } else if (mode === 'frame'){
       state.frames.push(F(p.x/view.W, p.y/view.H, 0, 0)); sel = state.frames.length - 1;
@@ -493,7 +528,7 @@ cv.addEventListener('pointermove', e => {
   const p = toLocal(e);
   if (!drag){
     const c = hitCorner(p, e.pointerType === 'touch' ? 18 : 10), onFrame = hitFrame(p) >= 0;
-    cv.style.cursor = c ? (c.i === 0 || c.i === 3 ? 'nwse-resize' : 'nesw-resize')
+    cv.style.cursor = c ? (c.vertex ? 'grab' : c.i % 2 === 0 ? 'nwse-resize' : 'nesw-resize')
       : onFrame ? (mode === 'frame' ? 'move' : 'grab') : (mode === 'frame' ? 'crosshair' : 'default');
     return;
   }
@@ -502,11 +537,14 @@ cv.addEventListener('pointermove', e => {
   if (drag.type === 'new' || drag.type === 'size'){
     const cx = Math.max(0, Math.min(W, p.x)), cy = Math.max(0, Math.min(H, p.y)), [ax, ay] = drag.anchor;
     r.x = Math.min(ax, cx) / W; r.y = Math.min(ay, cy) / H; r.w = Math.abs(cx - ax) / W; r.h = Math.abs(cy - ay) / H;
+  } else if (drag.type === 'vertex'){
+    const q = [Math.max(0, Math.min(W, p.x)) / W, Math.max(0, Math.min(H, p.y)) / H];
+    r.pts = (r.pts || rectPts(r)).map((v, k) => k === drag.i ? q : v); fitBox(r);
   } else {
     const ddx = (p.x - drag.sx) / W, ddy = (p.y - drag.sy) / H, o = drag.r0;
-    if (drag.type === 'frame'){ r.x = o.x + ddx; r.y = o.y + ddy; }
+    if (drag.type === 'frame') shiftFrame(r, o, ddx, ddy);
     if (drag.type === 'content'){ r.dx = o.dx + ddx; r.dy = o.dy + ddy; }
-    if (drag.type === 'piece'){ r.x = o.x + ddx; r.y = o.y + ddy; r.dx = o.dx + ddx; r.dy = o.dy + ddy; }
+    if (drag.type === 'piece'){ shiftFrame(r, o, ddx, ddy); r.dx = o.dx + ddx; r.dy = o.dy + ddy; }
   }
   syncSliders(); render();
 });
@@ -531,6 +569,7 @@ document.addEventListener('keydown', e => {
   if (e.key === '1') setMode('frame');
   if (e.key === '2') setMode('content');
   if (e.key === '3') setMode('piece');
+  if (e.key === '4') setMode('shape');
   if (e.key === 'Escape'){ sel = -1; syncSel(); render(); }
   const r = state.frames[sel]; if (!r) return;
   if (e.key === 'Delete' || e.key === 'Backspace'){ e.preventDefault(); deleteSel(); return; }
@@ -538,7 +577,7 @@ document.addEventListener('keydown', e => {
   if (mv){
     e.preventDefault(); if (!e.repeat) snapshot();
     const sx = (e.shiftKey ? 10 : 1) / view.W * mv[0], sy = (e.shiftKey ? 10 : 1) / view.H * mv[1];
-    if (mode !== 'content'){ r.x += sx; r.y += sy; }
+    if (mode !== 'content') shiftFrame(r, r, sx, sy);
     if (mode !== 'frame'){ r.dx += sx; r.dy += sy; }
     syncSliders(); render();
   }
@@ -626,8 +665,10 @@ function syncSel(){
   $('#clear').disabled = !state.frames.length;
   if (!r) return;
   $$('#rFont button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === r.font)));
+  $('#resetShape').hidden = !r.pts;
   syncSliders();
 }
+$('#resetShape').addEventListener('click', () => { const r = state.frames[sel]; if (!r || !r.pts) return; snapshot(); delete r.pts; syncSel(); render(); });
 $('#rFont').addEventListener('click', e => {
   const b = e.target.closest('button'), r = state.frames[sel]; if (!b || !r || r.font === b.dataset.v) return;
   snapshot(); r.font = b.dataset.v; syncSel(); render();
@@ -709,8 +750,11 @@ async function buildSVG(){
     const x = Math.round(r.x*W), y = Math.round(r.y*H), w = Math.round(r.x*W + r.w*W) - x, h = Math.round(r.y*H + r.h*H) - y;
     if (w < 1 || h < 1) return;
     const id = fontOf(r);
-    s += `<clipPath id="f${i}"><rect x="${x}" y="${y}" width="${w}" height="${h}" shape-rendering="crispEdges"/></clipPath>`
-      + `<g clip-path="url(#f${i})"><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${C.bg}" shape-rendering="crispEdges"/>`
+    const shape = r.pts
+      ? `<polygon points="${polyOf(r, W, H).map(([a, b]) => n2(a) + ',' + n2(b)).join(' ')}"`
+      : `<rect x="${x}" y="${y}" width="${w}" height="${h}" shape-rendering="crispEdges"`;
+    s += `<clipPath id="f${i}">${shape}/></clipPath>`
+      + `<g clip-path="url(#f${i})">${shape} fill="${C.bg}"/>`
       + `<g transform="translate(${n2(r.dx*W)} ${n2(r.dy*H)})" fill="${C.fg}">${blockSVG(fonts[id], byId(id), L, r.font === 'A')}</g></g>`;
   });
   return s + '</svg>';
