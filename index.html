@@ -61,9 +61,17 @@ textarea:focus{outline:none;border-color:var(--mute)}
 .slot{appearance:none;text-align:left;background:transparent;border:1px solid var(--line);border-radius:3px;padding:10px 12px 12px;cursor:pointer;color:var(--mute);display:flex;flex-direction:column;gap:8px;min-width:0}
 .slot small{font:500 10px/1 var(--ui);letter-spacing:.12em;text-transform:uppercase;display:flex;gap:6px;align-items:center}
 .slot small i{font-style:normal;font:600 10px/1 var(--mono);width:16px;height:16px;border-radius:2px;display:grid;place-items:center;border:1px solid currentColor}
-.slot span{color:var(--fg);font-size:22px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot .name{color:var(--fg);font-size:22px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .slot[aria-pressed=true]{border-color:var(--fg);color:var(--fg)}
 .slot[aria-pressed=true] small i{background:var(--fg);color:var(--panel);border-color:var(--fg)}
+.slot{position:relative}
+.slot .x{position:absolute;top:6px;right:6px;appearance:none;background:transparent;border:0;color:var(--dim);font:400 16px/1 var(--ui);width:22px;height:22px;border-radius:2px;cursor:pointer}
+.slot .x:hover{color:var(--fg);background:var(--line)}
+.slot.add{border-style:dashed;align-items:center;justify-content:center;gap:6px;min-height:68px}
+.slot.add span{font:300 22px/1 var(--ui);color:var(--mute)}
+.slot.add:hover{color:var(--fg);border-color:var(--dim)}
+.slot:focus-visible{outline:1px solid var(--acc);outline-offset:2px}
+#rFont button{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* Picker */
 .chips{display:flex;flex-wrap:wrap;gap:5px}
@@ -132,6 +140,7 @@ button:focus-visible,.file:focus-within{outline:1px solid var(--acc);outline-off
         <button data-mode="shape" data-i18n-title="shapeTitle"><span data-i18n="shape">Freiform</span> <kbd>4</kbd></button>
       </div>
       <div class="right">
+        <button class="btn" id="rand" data-i18n-title="randTitle"><span data-i18n="rand">Zufall</span></button>
         <button class="btn" id="undo" data-i18n="undo" data-i18n-title="undoTitle">Rückgängig</button>
         <div class="modes lang" role="group" aria-label="Sprache / Language">
           <button data-lang="de" lang="de">DE</button>
@@ -146,7 +155,7 @@ button:focus-visible,.file:focus-within{outline:1px solid var(--acc);outline-off
   <aside class="panel" aria-label="Editor">
     <header class="brand">
       <div class="logo" role="img" aria-label="Fragmentation"></div>
-      <p class="lede" data-i18n="lede">Zwei Schriften, ein Wort. Zieh Rahmen auf: außen steht Schrift A, innen Schrift B. Mit „Inhalt“ und „Stück“ verschiebst du die Fragmente danach frei.</p>
+      <p class="lede" data-i18n="lede">Mehrere Schriften, ein Wort. Zieh Rahmen auf: außen steht Schrift A, innen B, C … Mit „Inhalt“, „Stück“ und „Freiform“ bearbeitest du die Fragmente danach frei.</p>
     </header>
 
     <section>
@@ -156,10 +165,7 @@ button:focus-visible,.file:focus-within{outline:1px solid var(--acc);outline-off
 
     <section>
       <h2 data-i18n="fonts">Schriften</h2>
-      <div class="slots">
-        <button class="slot" data-slot="A"><small><i>A</i><span data-i18n="outer">Außen</span></small><span id="slotA"></span></button>
-        <button class="slot" data-slot="B"><small><i>B</i><span data-i18n="inner">Innen</span></small><span id="slotB"></span></button>
-      </div>
+      <div class="slots" id="slots"></div>
       <div class="chips" id="chips"></div>
       <label class="file"><span data-i18n="upload">Eigene Schrift laden (.ttf, .otf, .woff)</span><input type="file" id="upload" accept=".ttf,.otf,.woff,.woff2"></label>
     </section>
@@ -169,7 +175,7 @@ button:focus-visible,.file:focus-within{outline:1px solid var(--acc);outline-off
       <p id="selEmpty" class="hint" data-i18n="selEmpty">Kein Rahmen ausgewählt. Zieh im Modus „Rahmen“ ein Rechteck über das Wort.</p>
       <div id="selBody" hidden>
         <div class="row"><span class="lbl" data-i18n="font">Schrift</span>
-          <div class="seg" id="rFont"><button data-v="B" data-i18n="bInner">B · Innen</button><button data-v="A" data-i18n="aOuter">A · Außen</button></div>
+          <div class="seg" id="rFont"></div>
         </div>
         <div data-sliders="rDx,rDy"></div>
         <div class="row">
@@ -223,7 +229,7 @@ const I18N = {
     frame:'Rahmen', content:'Inhalt', piece:'Stück',
     frameTitle:'Rahmen aufziehen, verschieben und in der Größe ändern', contentTitle:'Schrift innerhalb eines Rahmens verschieben', pieceTitle:'Rahmen mitsamt Inhalt verschieben',
     undo:'Rückgängig', undoTitle:'Rückgängig (⌘Z)',
-    lede:'Zwei Schriften, ein Wort. Zieh Rahmen auf: außen steht Schrift A, innen Schrift B. Mit „Inhalt“ und „Stück“ verschiebst du die Fragmente danach frei.',
+    lede:'Mehrere Schriften, ein Wort. Zieh Rahmen auf: außen steht Schrift A, innen B, C … Mit „Inhalt“, „Stück“ und „Freiform“ bearbeitest du die Fragmente danach frei.',
     fonts:'Schriften', outer:'Außen', inner:'Innen', upload:'Eigene Schrift laden (.ttf, .otf, .woff)',
     selEmpty:'Kein Rahmen ausgewählt. Zieh im Modus „Rahmen“ ein Rechteck über das Wort.',
     font:'Schrift', bInner:'B · Innen', aOuter:'A · Außen', resetContent:'Inhalt zurücksetzen', delete:'Löschen', clear:'Alle Rahmen löschen',
@@ -231,12 +237,13 @@ const I18N = {
     fitBoxTitle:'B wird auf die Fläche von A gestreckt, Kanten treffen sich genau', fitWidthTitle:'B bekommt die Breite von A, Proportionen bleiben',
     canvasH:'Fläche', free:'Frei', color:'Farbe', showFrames:'Rahmen anzeigen (nur im Editor)', png:'PNG sichern',
     size:'Größe', track:'Laufweite', lead:'Zeilenabstand', rDx:'Inhalt horizontal', rDy:'Inhalt vertikal',
-    tipframe:'<b>Ziehen</b> auf leerer Fläche: neuer Rahmen · <b>Rahmen ziehen</b>: Ausschnitt verschieben · <b>Ecken</b>: Größe ändern',
+    tipframe:'<b>Ziehen</b> auf leerer Fläche: neuer Rahmen · <b>Rahmen ziehen</b>: Ausschnitt verschieben · <b>Ecken und Kanten</b>: Größe ändern',
     tipcontent:'<b>Im Rahmen ziehen</b>: Schrift im Rahmen verschieben, der Rahmen bleibt stehen',
     tippiece:'<b>Rahmen ziehen</b>: Rahmen samt Inhalt frei verschieben, wie ein ausgeschnittenes Stück',
     shape:'Freiform', shapeTitle:'Ecken frei verziehen, z. B. für schräge Formen', resetShape:'Form zurücksetzen',
-    tipshape:'<b>Rahmen anklicken</b>, dann <b>Ecken ziehen</b>: Form frei verziehen, z. B. schräg · <b>Rahmen ziehen</b>: verschieben',
-    tipKeys:' · <b>⌫</b> löschen · <b>⌘Z</b> rückgängig',
+    tipshape:'<b>Rahmen anklicken</b>, dann <b>Punkte oder Kanten ziehen</b>: Form frei verziehen · <b>Doppelklick</b> auf Kante: Punkt hinzufügen, auf Punkt: entfernen',
+    tipKeys:' · <b>⇧</b> gerade/proportional · <b>⌥</b> von der Mitte, ⌥-Ziehen dupliziert · <b>⌘D</b> duplizieren · <b>R</b> Zufall · <b>⌫</b> löschen · <b>⌘Z</b> rückgängig',
+    rand:'Zufall', randTitle:'Zufällige Komposition erzeugen (R)', minPoints:'Eine Form braucht mindestens drei Punkte.',
     hint:'Rahmen gesetzt. Mit „Inhalt“ (2) verschiebst du die Schrift darin, mit „Stück“ (3) den ganzen Rahmen.',
     loaded:(l, s) => `${l} geladen und als Schrift ${s} gesetzt`,
     badFont:'Diese Datei ließ sich nicht als Schrift lesen. Bitte TTF, OTF oder WOFF verwenden.',
@@ -244,13 +251,14 @@ const I18N = {
     saved:x => `${x} gesichert`, saveHint:'Rechtsklick oder lange drücken, dann „Bild sichern“.', close:'Schließen',
     svgBtn:'SVG sichern', pngBtn:'PNG', svgFail:'SVG-Export fehlgeschlagen: Die Schriftdatei ließ sich nicht laden. Bei eigenen Schriften bitte TTF, OTF oder WOFF verwenden.',
     whiteOnBlack:'Weiß auf Schwarz', blackOnWhite:'Schwarz auf Weiß',
+    addFont:'Schrift hinzufügen', removeFont:'Schrift entfernen',
   },
   en:{
     tool:'Tool', canvas:'Canvas',
     frame:'Frame', content:'Content', piece:'Piece',
     frameTitle:'Draw, move and resize frames', contentTitle:'Move the type inside a frame', pieceTitle:'Move a frame together with its content',
     undo:'Undo', undoTitle:'Undo (⌘Z)',
-    lede:'Two typefaces, one word. Draw frames: font A sits outside, font B inside. Then use “Content” and “Piece” to move the fragments freely.',
+    lede:'Several typefaces, one word. Draw frames: font A sits outside, B, C … inside. Then shape the fragments freely with “Content”, “Piece” and “Free form”.',
     fonts:'Fonts', outer:'Outer', inner:'Inner', upload:'Load your own font (.ttf, .otf, .woff)',
     selEmpty:'No frame selected. In “Frame” mode, drag a rectangle across the word.',
     font:'Font', bInner:'B · Inner', aOuter:'A · Outer', resetContent:'Reset content', delete:'Delete', clear:'Delete all frames',
@@ -258,12 +266,13 @@ const I18N = {
     fitBoxTitle:'B is stretched to the area of A so the edges meet exactly', fitWidthTitle:'B takes the width of A and keeps its proportions',
     canvasH:'Canvas', free:'Free', color:'Colour', showFrames:'Show frames (editor only)', png:'Save PNG',
     size:'Size', track:'Tracking', lead:'Leading', rDx:'Content horizontal', rDy:'Content vertical',
-    tipframe:'<b>Drag</b> on empty space: new frame · <b>Drag a frame</b>: move the window · <b>Corners</b>: resize',
+    tipframe:'<b>Drag</b> on empty space: new frame · <b>Drag a frame</b>: move the window · <b>Corners and edges</b>: resize',
     tipcontent:'<b>Drag inside a frame</b>: move the type inside it, the frame stays put',
     tippiece:'<b>Drag a frame</b>: move frame and content freely, like a cut-out piece',
     shape:'Free form', shapeTitle:'Drag corners freely, e.g. for slanted shapes', resetShape:'Reset shape',
-    tipshape:'<b>Click a frame</b>, then <b>drag its corners</b>: distort the shape freely, e.g. slanted · <b>Drag a frame</b>: move it',
-    tipKeys:' · <b>⌫</b> delete · <b>⌘Z</b> undo',
+    tipshape:'<b>Click a frame</b>, then <b>drag points or edges</b>: distort the shape freely · <b>Double-click</b> an edge: add a point, a point: remove it',
+    tipKeys:' · <b>⇧</b> straight/proportional · <b>⌥</b> from centre, ⌥-drag duplicates · <b>⌘D</b> duplicate · <b>R</b> randomize · <b>⌫</b> delete · <b>⌘Z</b> undo',
+    rand:'Randomize', randTitle:'Generate a random composition (R)', minPoints:'A shape needs at least three points.',
     hint:'Frame placed. Use “Content” (2) to move the type inside it, or “Piece” (3) to move the whole frame.',
     loaded:(l, s) => `${l} loaded and set as font ${s}`,
     badFont:'This file could not be read as a font. Please use TTF, OTF or WOFF.',
@@ -271,6 +280,7 @@ const I18N = {
     saved:x => `${x} saved`, saveHint:'Right-click or long-press, then “Save image”.', close:'Close',
     svgBtn:'Save SVG', pngBtn:'PNG', svgFail:'SVG export failed: the font file could not be loaded. For your own fonts, please use TTF, OTF or WOFF.',
     whiteOnBlack:'White on black', blackOnWhite:'Black on white',
+    addFont:'Add font', removeFont:'Remove font',
   },
 };
 let lang = 'de';
@@ -307,13 +317,19 @@ const COLORS = [
 ];
 
 const state = {
-  text:'Fragment', A:'inter', B:'instrument', slot:'B',
+  /* fonts[0] ist A (außen), fonts[1..] sind B, C, D … für die Rahmen */
+  text:'Fragment', fonts:['inter', 'instrument'], slot:1,
   size:78, track:0, lead:96, fit:'box', format:'free', colors:0, showFrames:true,
   frames:[]
 };
 let mode = 'frame', sel = -1, fontsReady = false;
 const view = {W:800, H:500, dpr:1};
 const F = (x,y,w,h,font='B',dx=0,dy=0) => ({x,y,w,h,font,dx,dy});
+const MAX_FONTS = 6;
+const letter = i => String.fromCharCode(65 + i);
+const slotIndex = l => Math.min(l.charCodeAt(0) - 65, state.fonts.length - 1);
+const slotFont = l => state.fonts[slotIndex(l)];
+const fontA = () => state.fonts[0];
 /* Start-Rahmen relativ zum Wort; werden nach dem Laden der Schriften auf die Fläche umgerechnet */
 let pendingBox = [F(-.03,-.12,.22,.58), F(.36,.46,.3,.7), F(.8,-.12,.24,.58)];
 
@@ -328,7 +344,7 @@ function measure(f, px, str){
   return {L:m.actualBoundingBoxLeft, R:m.actualBoundingBoxRight, A:m.actualBoundingBoxAscent, D:m.actualBoundingBoxDescent};
 }
 function layout(W, H){
-  const lines = (state.text || ' ').split('\n'), f = byId(state.A), REF = 100;
+  const lines = (state.text || ' ').split('\n'), f = byId(fontA()), REF = 100;
   const ms = lines.map(s => s.trim() ? measure(f, REF, s) : null);
   const widths = ms.map(m => m ? m.L + m.R : 0), maxW = Math.max(1, ...widths);
   let px = REF * (W * state.size / 100) / maxW;
@@ -400,7 +416,7 @@ function paint(c, W, H, ui, ps){
   const C = COLORS[state.colors];
   c.fillStyle = C.bg; c.fillRect(0, 0, W, H);
   const L = layout(W, H);
-  c.fillStyle = C.fg; drawBlock(c, byId(state.A), L, true);
+  c.fillStyle = C.fg; drawBlock(c, byId(fontA()), L, true);
   for (const r of state.frames){
     if (r.w*W < 1 || r.h*H < 1) continue;
     c.save();
@@ -416,7 +432,7 @@ function paint(c, W, H, ui, ps){
       c.fillStyle = C.bg; c.fillRect(rx, ry, rw, rh);
     }
     c.translate(r.dx * W, r.dy * H); c.fillStyle = C.fg;
-    drawBlock(c, byId(r.font === 'A' ? state.A : state.B), L, r.font === 'A');
+    drawBlock(c, byId(slotFont(r.font)), L, r.font === 'A');
     c.restore();
   }
   if (!ui) return;
@@ -472,10 +488,16 @@ new ResizeObserver(fit).observe(stage);
 
 /* ---------- Verlauf ---------- */
 const hist = [];
-const snap = () => JSON.stringify(state.frames);
+const snap = () => JSON.stringify({f:state.frames, s:state.fonts});
 function pushIfChanged(before){ if (before !== snap()){ hist.push(before); if (hist.length > 100) hist.shift(); } }
 function snapshot(){ hist.push(snap()); if (hist.length > 100) hist.shift(); }
-function undo(){ if (!hist.length) return; state.frames = JSON.parse(hist.pop()); if (sel >= state.frames.length) sel = -1; syncSel(); render(); }
+function undo(){
+  if (!hist.length) return;
+  const o = JSON.parse(hist.pop()); state.frames = o.f; state.fonts = o.s;
+  if (state.slot >= state.fonts.length) state.slot = state.fonts.length - 1;
+  if (sel >= state.frames.length) sel = -1;
+  syncFonts(); syncSel(); render();
+}
 
 /* ---------- Modi ---------- */
 function setMode(m){
@@ -491,12 +513,16 @@ $$('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.datas
 let drag = null, hinted = false;
 const toLocal = e => { const b = cv.getBoundingClientRect(); return {x:(e.clientX - b.left) * view.W / b.width, y:(e.clientY - b.top) * view.H / b.height}; };
 const px = r => ({x:r.x*view.W, y:r.y*view.H, w:r.w*view.W, h:r.h*view.H});
-function hitCorner(p, tol){
+/* Griffe wie in Illustrator/Figma: Ecken, Kanten, bei Freiform einzelne Punkte und ganze Kanten */
+const TOL = e => e.pointerType === 'touch' ? 18 : 10;
+function segT(p, a, b){ const dx = b[0] - a[0], dy = b[1] - a[1], l = dx*dx + dy*dy || 1; return Math.max(0, Math.min(1, ((p.x - a[0])*dx + (p.y - a[1])*dy) / l)); }
+function segDist(p, a, b){ const k = segT(p, a, b); return Math.hypot(p.x - (a[0] + (b[0] - a[0])*k), p.y - (a[1] + (b[1] - a[1])*k)); }
+function hitHandle(p, tol){
   const r = state.frames[sel];
   if (!r || (mode !== 'frame' && mode !== 'shape')) return null;
-  const pts = polyOf(r, view.W, view.H);
-  for (let i = 0; i < 4; i++) if (Math.abs(p.x - pts[i][0]) < tol && Math.abs(p.y - pts[i][1]) < tol)
-    return (mode === 'shape' || r.pts) ? {i, vertex:true} : {i, anchor:pts[(i + 2) % 4]};
+  const pts = polyOf(r, view.W, view.H), free = mode === 'shape' || !!r.pts, n = pts.length;
+  for (let i = 0; i < n; i++) if (Math.abs(p.x - pts[i][0]) < tol && Math.abs(p.y - pts[i][1]) < tol) return {kind:free ? 'vertex' : 'corner', i};
+  for (let i = 0; i < n; i++) if (segDist(p, pts[i], pts[(i + 1) % n]) < tol * .7) return {kind:free ? 'edge' : 'side', i};
   return null;
 }
 function hitFrame(p){
@@ -505,20 +531,45 @@ function hitFrame(p){
   for (let i = state.frames.length - 1; i >= 0; i--) if (hit(i)) return i;
   return -1;
 }
+/* Shift: Bewegung auf 0°/45°/90° bzw. auf eine Achse festlegen */
+function snap45(dx, dy){ const a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4), ux = Math.cos(a), uy = Math.sin(a), d = dx*ux + dy*uy; return [ux*d, uy*d]; }
+const axisLock = (dx, dy) => Math.abs(dx) > Math.abs(dy) ? [dx, 0] : [0, dy];
+/* Rechteck ziehen/skalieren: Shift hält das Seitenverhältnis (beim Aufziehen: Quadrat), Alt skaliert von der Mitte */
+function resizeRect(r, o, h, p, shift, alt){
+  const cx = (o.x0 + o.x1) / 2, cy = (o.y0 + o.y1) / 2;
+  const ar = Math.max(1e-6, o.x1 - o.x0) / Math.max(1e-6, o.y1 - o.y0);
+  const corner = h.kind === 'corner', useX = corner || h.i % 2 === 1, useY = corner || h.i % 2 === 0;
+  const left = corner ? (h.i === 0 || h.i === 3) : h.i === 3, top = corner ? (h.i === 0 || h.i === 1) : h.i === 0;
+  const fx = alt ? cx : (left ? o.x1 : o.x0), fy = alt ? cy : (top ? o.y1 : o.y0), k = alt ? 2 : 1;
+  let w = useX ? (p.x - fx) * k : o.x1 - o.x0, hh = useY ? (p.y - fy) * k : o.y1 - o.y0;
+  if (shift){
+    if (useX && useY){ if (Math.abs(w) / ar > Math.abs(hh)) hh = Math.sign(hh || 1) * Math.abs(w) / ar; else w = Math.sign(w || 1) * Math.abs(hh) * ar; }
+    else if (useX) hh = Math.abs(w) / ar; else w = Math.abs(hh) * ar;
+  }
+  const span = (use, f, c, v) => use && !alt ? [f, f + v] : [c - Math.abs(v) / 2, c + Math.abs(v) / 2];
+  const [x0, x1] = span(useX, fx, cx, w), [y0, y1] = span(useY, fy, cy, hh);
+  r.x = Math.min(x0, x1) / view.W; r.y = Math.min(y0, y1) / view.H; r.w = Math.abs(x1 - x0) / view.W; r.h = Math.abs(y1 - y0) / view.H;
+}
+const boxPx = r => ({x0:r.x*view.W, y0:r.y*view.H, x1:(r.x + r.w)*view.W, y1:(r.y + r.h)*view.H});
 cv.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
-  const p = toLocal(e), tol = e.pointerType === 'touch' ? 18 : 10, before = snap();
-  const corner = hitCorner(p, tol);
-  if (corner){ drag = corner.vertex ? {type:'vertex', i:corner.i, before} : {type:'size', anchor:corner.anchor, before}; }
-  else {
-    const i = hitFrame(p);
+  const p = toLocal(e), before = snap();
+  const h = hitHandle(p, TOL(e));
+  if (h){
+    const r = state.frames[sel];
+    drag = {type:h.kind === 'corner' || h.kind === 'side' ? 'size' : h.kind, h, sx:p.x, sy:p.y, o:boxPx(r), p0:JSON.parse(JSON.stringify(r.pts || rectPts(r))), before};
+  } else {
+    let i = hitFrame(p);
     if (i >= 0){
+      if (e.altKey && mode !== 'content'){ // Alt-Ziehen dupliziert wie in Figma
+        state.frames.push(JSON.parse(JSON.stringify(state.frames[i]))); i = state.frames.length - 1;
+      }
       sel = i; const r = state.frames[i];
-      drag = {type:mode === 'shape' ? 'frame' : mode, sx:p.x, sy:p.y, r0:{...r}, before};
+      drag = {type:mode === 'shape' ? 'frame' : mode, sx:p.x, sy:p.y, r0:JSON.parse(JSON.stringify(r)), before};
       if (mode !== 'frame') cv.style.cursor = 'grabbing';
     } else if (mode === 'frame'){
-      state.frames.push(F(p.x/view.W, p.y/view.H, 0, 0)); sel = state.frames.length - 1;
-      drag = {type:'new', anchor:[p.x, p.y], before};
+      state.frames.push(F(p.x/view.W, p.y/view.H, 0, 0, newLetter())); sel = state.frames.length - 1;
+      drag = {type:'new', h:{kind:'corner', i:2}, o:{x0:p.x, y0:p.y, x1:p.x, y1:p.y}, before};
     } else { sel = -1; }
   }
   if (drag) cv.setPointerCapture(e.pointerId);
@@ -527,26 +578,39 @@ cv.addEventListener('pointerdown', e => {
 cv.addEventListener('pointermove', e => {
   const p = toLocal(e);
   if (!drag){
-    const c = hitCorner(p, e.pointerType === 'touch' ? 18 : 10), onFrame = hitFrame(p) >= 0;
-    cv.style.cursor = c ? (c.vertex ? 'grab' : c.i % 2 === 0 ? 'nwse-resize' : 'nesw-resize')
-      : onFrame ? (mode === 'frame' ? 'move' : 'grab') : (mode === 'frame' ? 'crosshair' : 'default');
+    const h = hitHandle(p, TOL(e)), onFrame = hitFrame(p) >= 0;
+    cv.style.cursor = h ? ({corner:h.i % 2 === 0 ? 'nwse-resize' : 'nesw-resize', side:h.i % 2 === 0 ? 'ns-resize' : 'ew-resize', vertex:'crosshair', edge:'grab'})[h.kind]
+      : onFrame ? (e.altKey && mode !== 'content' ? 'copy' : mode === 'frame' ? 'move' : 'grab') : (mode === 'frame' ? 'crosshair' : 'default');
     return;
   }
   const r = state.frames[sel]; if (!r) return;
   const W = view.W, H = view.H;
   if (drag.type === 'new' || drag.type === 'size'){
-    const cx = Math.max(0, Math.min(W, p.x)), cy = Math.max(0, Math.min(H, p.y)), [ax, ay] = drag.anchor;
-    r.x = Math.min(ax, cx) / W; r.y = Math.min(ay, cy) / H; r.w = Math.abs(cx - ax) / W; r.h = Math.abs(cy - ay) / H;
-  } else if (drag.type === 'vertex'){
-    const q = [Math.max(0, Math.min(W, p.x)) / W, Math.max(0, Math.min(H, p.y)) / H];
-    r.pts = (r.pts || rectPts(r)).map((v, k) => k === drag.i ? q : v); fitBox(r);
+    resizeRect(r, drag.o, drag.h, p, e.shiftKey, e.altKey);
+  } else if (drag.type === 'vertex' || drag.type === 'edge'){
+    let [dx, dy] = [p.x - drag.sx, p.y - drag.sy];
+    if (e.shiftKey) [dx, dy] = snap45(dx, dy);
+    const n = drag.p0.length, moved = drag.type === 'vertex' ? [drag.h.i] : [drag.h.i, (drag.h.i + 1) % n];
+    r.pts = drag.p0.map((v, k) => moved.includes(k) ? [v[0] + dx / W, v[1] + dy / H] : v); fitBox(r);
   } else {
-    const ddx = (p.x - drag.sx) / W, ddy = (p.y - drag.sy) / H, o = drag.r0;
+    let [ddx, ddy] = [(p.x - drag.sx) / W, (p.y - drag.sy) / H];
+    if (e.shiftKey) [ddx, ddy] = axisLock(ddx, ddy);
+    const o = drag.r0;
     if (drag.type === 'frame') shiftFrame(r, o, ddx, ddy);
     if (drag.type === 'content'){ r.dx = o.dx + ddx; r.dy = o.dy + ddy; }
     if (drag.type === 'piece'){ shiftFrame(r, o, ddx, ddy); r.dx = o.dx + ddx; r.dy = o.dy + ddy; }
   }
   syncSliders(); render();
+});
+/* Doppelklick in Freiform: auf eine Kante = Punkt hinzufügen, auf einen Punkt = Punkt entfernen */
+cv.addEventListener('dblclick', e => {
+  if (mode !== 'shape') return;
+  const r = state.frames[sel], p = toLocal(e), h = hitHandle(p, TOL(e)); if (!r || !h) return;
+  snapshot();
+  const pts = (r.pts || rectPts(r)).slice();
+  if (h.kind === 'vertex'){ if (pts.length <= 3){ toast(t('minPoints')); hist.pop(); return; } pts.splice(h.i, 1); }
+  else if (h.kind === 'edge') pts.splice(h.i + 1, 0, [p.x / view.W, p.y / view.H]);
+  r.pts = pts; fitBox(r); syncSel(); render();
 });
 function endDrag(){
   if (!drag) return;
@@ -565,7 +629,9 @@ document.addEventListener('keydown', e => {
   const t = e.target.tagName;
   if (t === 'TEXTAREA' || t === 'INPUT') return;
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z'){ e.preventDefault(); undo(); return; }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd'){ e.preventDefault(); duplicateSel(); return; }
   if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key.toLowerCase() === 'r'){ randomize(); return; }
   if (e.key === '1') setMode('frame');
   if (e.key === '2') setMode('content');
   if (e.key === '3') setMode('piece');
@@ -583,6 +649,79 @@ document.addEventListener('keydown', e => {
   }
 });
 function deleteSel(){ if (!state.frames[sel]) return; snapshot(); state.frames.splice(sel, 1); sel = -1; syncSel(); render(); }
+/* ---------- Zufall ----------
+   Wählt 2–4 kontrastierende Schriften und eines von mehreren Kompositionsrezepten,
+   die sich an den Beispielen orientieren: Glitch-Streifen, Spalten, Pixelraster, Schnitte, schräge Bänder, verschobene Stücke. */
+const CATS = {
+  sans:['inter','archivo','syne','unbounded'], serif:['instrument','bodoni','playfair','fraunces','dmserif'],
+  pixel:['silkscreen','pixelify','vt323'], mono:['spacemono','majormono','rubikmono'], display:['bagel','monoton','fraktur','pinyon'],
+};
+function randomize(){
+  if (!fontsReady) return;
+  snapshot();
+  const R = Math.random, pick = a => a[Math.floor(R() * a.length)], rr = (a, b) => a + R() * (b - a);
+  /* Schriften: jede aus einer anderen Kategorie, damit der Kontrast stimmt */
+  const cats = Object.keys(CATS).sort(() => R() - .5), n = 2 + Math.floor(R() * 3);
+  state.fonts = cats.slice(0, n).map(c => pick(CATS[c]));
+  state.slot = 1;
+  const W = view.W, H = view.H, B = layout(W, H).bbox, pad = Math.min(W, H) * .02;
+  const bx0 = B.x0 - pad, by0 = B.y0 - pad, bw = B.x1 - B.x0 + pad*2, bh = B.y1 - B.y0 + pad*2;
+  const inner = () => letter(1 + Math.floor(R() * (n - 1)));
+  const out = [];
+  const rect = (x, y, w, h, font, dx = 0, dy = 0) => out.push(F(x / W, y / H, w / W, h / H, font, dx / W, dy / H));
+  const poly = (pts, font, dx = 0, dy = 0) => { const r = F(0, 0, 0, 0, font, dx / W, dy / H); r.pts = pts.map(([x, y]) => [x / W, y / H]); fitBox(r); out.push(r); };
+  const recipes = {
+    glitch(){ // waagerechte Streifen, einige seitlich versetzt
+      const k = 4 + Math.floor(R() * 9), sh = bh / k;
+      for (let i = 0; i < k; i++) if (R() < .85) rect(0, by0 + i*sh, W, sh + .5, R() < .2 ? 'A' : inner(), R() < .65 ? rr(-1, 1) * bw * .07 : 0);
+    },
+    columns(){ // senkrechte Spalten im Wechsel
+      const k = 3 + Math.floor(R() * 8), cw = bw / k, off = R() < .5;
+      for (let i = 0; i < k; i++) if (i % 2 === (off ? 1 : 0) || R() < .25) rect(bx0 + i*cw, 0, cw + .5, H, inner(), 0, R() < .35 ? rr(-1, 1) * bh * .15 : 0);
+    },
+    pixel(){ // Raster aus kleinen Zellen
+      const cols = 10 + Math.floor(R() * 18), cs = bw / cols, rows = Math.max(2, Math.round(bh / cs)), ch = bh / rows, d = rr(.18, .45), f = inner();
+      for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) if (R() < d) rect(bx0 + x*cs, by0 + y*ch, cs + .5, ch + .5, R() < .8 ? f : inner());
+    },
+    cut(){ // große Schnitte: obere oder untere Hälfte, dazu einzelne Fenster
+      const y = by0 + bh * rr(.35, .6);
+      if (R() < .5) rect(bx0 - pad, by0 - bh, bw + pad*2, y - by0 + bh, inner()); else rect(bx0 - pad, y, bw + pad*2, bh * 2, inner());
+      for (let i = 0, k = Math.floor(R() * 3); i < k; i++){ const w = bw * rr(.08, .22); rect(bx0 + R() * (bw - w), by0 - pad, w, bh + pad*2, inner()); }
+    },
+    slant(){ // schräge Bänder quer durch das Wort
+      const k = 1 + Math.floor(R() * 3), tilt = rr(-.6, .6) * bh;
+      for (let i = 0; i < k; i++){
+        const x = bx0 + bw * rr(0, .85), w = bw * rr(.06, .25);
+        poly([[x + tilt, by0 - pad], [x + w + tilt, by0 - pad], [x + w - tilt, by0 + bh + pad], [x - tilt, by0 + bh + pad]], inner(), R() < .4 ? rr(-1, 1) * bw * .03 : 0);
+      }
+    },
+    pieces(){ // ausgeschnittene, verschobene Stücke
+      for (let i = 0, k = 3 + Math.floor(R() * 5); i < k; i++){
+        const w = bw * rr(.1, .32), h = bh * rr(.4, 1), x = bx0 + R() * (bw - w), y = by0 + R() * (bh - h);
+        const mx = rr(-1, 1) * bw * .05, my = rr(-1, 1) * bh * .25;
+        rect(x + mx, y + my, w, h, R() < .2 ? 'A' : inner(), mx, my);
+      }
+    },
+  };
+  /* ein bis zwei Rezepte; wenn zu wenig vom Wort betroffen ist, kommt ein weiteres dazu */
+  const names = Object.keys(recipes), used = [pick(names)];
+  if (R() < .6) used.push(pick(names.filter(k => !used.includes(k) && k !== 'pixel')));
+  used.forEach(k => recipes[k]());
+  const coverage = () => out.reduce((a, r) => {
+    const ix = Math.max(0, Math.min(r.x*W + r.w*W, bx0 + bw) - Math.max(r.x*W, bx0)), iy = Math.max(0, Math.min(r.y*H + r.h*H, by0 + bh) - Math.max(r.y*H, by0));
+    return a + ix * iy / (bw * bh);
+  }, 0);
+  for (let tries = 0; tries < 3 && coverage() < .3; tries++) recipes[pick(['cut', 'columns', 'glitch', 'slant'])]();
+  state.frames = out; sel = -1;
+  syncFonts(); syncSel(); render();
+}
+$('#rand').addEventListener('click', randomize);
+function duplicateSel(){
+  const r = state.frames[sel]; if (!r) return; snapshot();
+  const c = JSON.parse(JSON.stringify(r)), d = 12;
+  shiftFrame(c, c, d / view.W, d / view.H); c.dx += d / view.W; c.dy += d / view.H;
+  state.frames.push(c); sel = state.frames.length - 1; syncSel(); render();
+}
 
 /* ---------- Regler ---------- */
 const SL = {
@@ -625,23 +764,74 @@ function buildChips(){
   FONTS.forEach(f => {
     const b = document.createElement('button'); b.className = 'chip'; b.type = 'button'; b.dataset.id = f.id;
     b.textContent = f.label; styleFor(b, f); if (f.small) b.style.fontSize = '13px';
-    b.addEventListener('click', () => { state[state.slot] = f.id; syncFonts(); render(); });
+    b.addEventListener('click', () => {
+      if (state.fonts[state.slot] === f.id) return;
+      snapshot(); state.fonts[state.slot] = f.id; syncFonts(); render();
+    });
     box.appendChild(b);
   });
   syncFonts();
 }
+/* Schrift-Slots: A außen, B, C … innen. Neue Slots über „+“, entfernen über „×“. */
 function syncFonts(){
-  ['A', 'B'].forEach(s => { const el = $('#slot' + s), f = byId(state[s]); el.textContent = f.label; styleFor(el, f); el.style.fontSize = f.small ? '15px' : '22px'; });
-  $$('.slot').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.slot === state.slot)));
-  $$('.chip').forEach(b => {
-    const a = b.dataset.id === state.A, bb = b.dataset.id === state.B;
-    b.classList.toggle('inA', a); b.classList.toggle('inB', bb);
-    b.querySelector('.tag')?.remove();
-    if (a || bb){ const t = document.createElement('span'); t.className = 'tag'; t.textContent = a && bb ? 'A B' : a ? 'A' : 'B'; b.appendChild(t); }
-    b.setAttribute('aria-pressed', String(b.dataset.id === state[state.slot]));
+  const box = $('#slots'); box.innerHTML = '';
+  state.fonts.forEach((id, i) => {
+    const f = byId(id), b = document.createElement('div');
+    b.className = 'slot'; b.setAttribute('role', 'button'); b.tabIndex = 0;
+    b.setAttribute('aria-pressed', String(i === state.slot));
+    b.innerHTML = `<small><i>${letter(i)}</i><span>${i ? t('inner') + (state.fonts.length > 2 ? ' ' + i : '') : t('outer')}</span></small><span class="name"></span>`
+      + (i >= 2 ? `<button class="x" type="button" aria-label="${t('removeFont')} ${letter(i)}" title="${t('removeFont')}">×</button>` : '');
+    const nm = b.querySelector('.name'); nm.textContent = f.label; styleFor(nm, f); nm.style.fontSize = f.small ? '15px' : '22px';
+    const pick = () => { state.slot = i; syncFonts(); };
+    b.addEventListener('click', e => { if (e.target.closest('.x')){ e.stopPropagation(); removeSlot(i); } else pick(); });
+    b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); pick(); } });
+    box.appendChild(b);
   });
+  if (state.fonts.length < MAX_FONTS){
+    const add = document.createElement('button'); add.type = 'button'; add.className = 'slot add';
+    add.innerHTML = `<span>+</span><small>${t('addFont')}</small>`;
+    add.addEventListener('click', addSlot);
+    box.appendChild(add);
+  }
+  $$('.chip').forEach(b => {
+    const used = state.fonts.map((id, i) => id === b.dataset.id ? letter(i) : null).filter(Boolean);
+    b.classList.toggle('inA', used.length > 0);
+    b.querySelector('.tag')?.remove();
+    if (used.length){ const tg = document.createElement('span'); tg.className = 'tag'; tg.textContent = used.join(' '); b.appendChild(tg); }
+    b.setAttribute('aria-pressed', String(b.dataset.id === state.fonts[state.slot]));
+  });
+  buildFrameFonts();
 }
-$$('.slot').forEach(b => b.addEventListener('click', () => { state.slot = b.dataset.slot; syncFonts(); }));
+function addSlot(){
+  if (state.fonts.length >= MAX_FONTS) return;
+  snapshot();
+  const free = FONTS.filter(f => !state.fonts.includes(f.id));
+  state.fonts.push((free[Math.floor(Math.random() * free.length)] || FONTS[0]).id);
+  state.slot = state.fonts.length - 1;
+  syncFonts(); syncSel(); render();
+}
+function removeSlot(i){
+  if (i < 2) return;
+  snapshot();
+  state.fonts.splice(i, 1);
+  state.frames.forEach(r => { const k = r.font.charCodeAt(0) - 65; if (k === i) r.font = 'B'; else if (k > i) r.font = letter(k - 1); });
+  if (state.slot >= state.fonts.length) state.slot = state.fonts.length - 1;
+  syncFonts(); syncSel(); render();
+}
+/* Schriftwahl für den ausgewählten Rahmen: alle Slots außer A zuerst, A am Ende */
+function buildFrameFonts(){
+  const box = $('#rFont'); box.innerHTML = '';
+  const order = state.fonts.map((_, i) => i).filter(i => i > 0).concat(0);
+  order.forEach(i => {
+    const b = document.createElement('button'); b.type = 'button'; b.dataset.v = letter(i);
+    b.textContent = `${letter(i)} · ${byId(state.fonts[i]).label}`;
+    box.appendChild(b);
+  });
+  const r = state.frames[sel];
+  if (r) $$('#rFont button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === r.font)));
+}
+/* neue Rahmen bekommen die gerade aktive Innen-Schrift */
+const newLetter = () => letter(state.slot > 0 ? state.slot : 1);
 
 let upCount = 0;
 $('#upload').addEventListener('change', async e => {
@@ -652,7 +842,7 @@ $('#upload').addEventListener('change', async e => {
     await face.load(); document.fonts.add(face);
     const id = 'u' + upCount, label = file.name.replace(/\.(ttf|otf|woff2?)$/i, '').slice(0, 24);
     FONTS.push({id, label, fam:`"${fam}"`, w:400, buf});
-    state[state.slot] = id; buildChips(); render(); toast(t('loaded')(label, state.slot));
+    snapshot(); state.fonts[state.slot] = id; buildChips(); render(); toast(t('loaded')(label, letter(state.slot)));
   } catch (err) { toast(t('badFont')); }
   e.target.value = '';
 });
@@ -742,10 +932,10 @@ const blockSVG = (font, f, L, isA) => blockTx(f, L, isA)
   .map(o => `<path transform="translate(${n2(o.tx)} ${n2(o.ty)}) scale(${o.sx.toFixed(5)} ${o.sy.toFixed(5)})" d="${pathD(font, o.str, L.px)}"/>`).join('');
 async function buildSVG(){
   const W = view.W, H = view.H, C = COLORS[state.colors], L = layout(W, H);
-  const fontOf = r => r.font === 'A' ? state.A : state.B, fonts = {};
-  for (const id of new Set([state.A, ...state.frames.map(fontOf)])) fonts[id] = await otFont(byId(id));
+  const fontOf = r => slotFont(r.font), fonts = {};
+  for (const id of new Set([fontA(), ...state.frames.map(fontOf)])) fonts[id] = await otFont(byId(id));
   let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`
-    + `<rect width="${W}" height="${H}" fill="${C.bg}"/><g fill="${C.fg}">${blockSVG(fonts[state.A], byId(state.A), L, true)}</g>`;
+    + `<rect width="${W}" height="${H}" fill="${C.bg}"/><g fill="${C.fg}">${blockSVG(fonts[fontA()], byId(fontA()), L, true)}</g>`;
   state.frames.forEach((r, i) => {
     const x = Math.round(r.x*W), y = Math.round(r.y*H), w = Math.round(r.x*W + r.w*W) - x, h = Math.round(r.y*H + r.h*H) - y;
     if (w < 1 || h < 1) return;
@@ -784,7 +974,7 @@ function applyLang(){
   $$('[data-i18n-aria]').forEach(el => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
   [...swBox.children].forEach((b, i) => b.setAttribute('aria-label', t(i ? 'blackOnWhite' : 'whiteOnBlack')));
   $$('[data-lang]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
-  setMode(mode); syncSel();
+  setMode(mode); syncFonts(); syncSel();
 }
 $$('[data-lang]').forEach(b => b.addEventListener('click', () => {
   lang = b.dataset.lang;
